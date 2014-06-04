@@ -1,5 +1,6 @@
 import time, json, erppeek
 import BaseHTTPServer
+from urlparse import urlparse, parse_qs
 
 
 
@@ -42,8 +43,26 @@ class MyHandler(BaseHTTPServer.BaseHTTPRequestHandler):
             self.end_headers()
             self.wfile.write("<html><body>Not authorized.</body></html>")
             return False
-
         self.partner = self.partner[0]
+
+
+        # Make sure the data type is accepted
+        # -----------------------------------
+        if "content-type" not in headers:
+            log('Invalid request sent to server: no content-type provided.')
+            self.send_response(400)
+            self.send_header("Content-type", "text/html")
+            self.end_headers()
+            self.wfile.write("<html><body>You did not provide the content-type.</body></html>")
+            return False
+        if headers['content-type'] != 'application/json' and headers['content-type'] != 'application/xml':
+            log('Invalid request sent to server: incompatible content-type provided.')
+            self.send_response(400)
+            self.send_header("Content-type", "text/html")
+            self.end_headers()
+            self.wfile.write("<html><body>You did not provide a valid content-type.</body></html>")
+            return False
+
         return True
 
 
@@ -83,7 +102,8 @@ class MyHandler(BaseHTTPServer.BaseHTTPRequestHandler):
 
         # Validate the routing
         # --------------------
-        flow = [x for x in config['edi_routing'] if x['path'] == self.path ]
+        split_path = self.path.split('?')
+        flow = [x for x in config['edi_routing'] if x['path'] == split_path[0] ]
         if not flow:
             log('Invalid request sent to server: unknown path provided: {!s}'.format(self.path))
             self.send_response(404)
@@ -95,25 +115,29 @@ class MyHandler(BaseHTTPServer.BaseHTTPRequestHandler):
 
         # Validate all required information is present
         # --------------------------------------------
+        parameters = parse_qs(urlparse(self.path).query)
+        if not parameters:
+            log('Invalid request sent to server: missing GET parameter reference.')
+            self.send_response(400)
+            self.send_header("Content-type", "text/html")
+            self.end_headers()
+            self.wfile.write("<html><body>Bad request. Missing parameter 'reference'</body></html>")
+            return False
+
         length = int(self.headers.getheader('content-length'))
         try:
-            content = json.loads(self.rfile.read(length))
+            content = self.rfile.read(length)
         except Exception as e:
-            log('Invalid request sent to server: request data is broken, should be json. Error given: {!s}'.format(str(e)))
+            log('Invalid request sent to server: request data is broken. Error given: {!s}'.format(str(e)))
             self.send_response(400)
             self.send_header("Content-type", "text/html")
             self.end_headers()
             self.wfile.write("<html><body>Bad request.</body></html>")
             return False
 
-        if 'reference' not in content or 'data_type' not in content or 'content' not in content:
-            log('Invalid request sent to server: request data is broken, should be json.')
-            self.send_response(400)
-            self.send_header("Content-type", "text/html")
-            self.end_headers()
-            self.wfile.write("<html><body>Bad request.</body></html>")
-            return False
-
+        data_type = 'json'
+        if self.headers.dict['content-type'] != 'application/json':
+            data_type = 'xml'
 
         # Connect to OpenERP
         # ------------------
@@ -132,7 +156,7 @@ class MyHandler(BaseHTTPServer.BaseHTTPRequestHandler):
 
 
         model = client.model('clubit.tools.edi.document.incoming')
-        result = model.create_from_web_request(self.partner['id'], flow['flow'], content['reference'], content['content'], content['data_type'])
+        result = model.create_from_web_request(self.partner['id'], flow['flow'], parameters['reference'][0], content, data_type)
         if result == True:
             log('OpenERP target server has accepted the request.')
             self.send_response(200)

@@ -27,11 +27,11 @@ _config_template = """
 
     "edi_routing" : [
         {
-            "path": "/edi/purchaseOrder",
+            "path": "/edi/purchaseorder",
             "flow": "edi_thr_purchase_order_in"
         },
         {
-            "path": "/edi/saleOrder",
+            "path": "/edi/saleorder",
             "flow": "edi_spree_sale_order_in"
         }
     ]

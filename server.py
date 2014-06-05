@@ -15,6 +15,7 @@ config = False
 class MyHandler(BaseHTTPServer.BaseHTTPRequestHandler):
 
     partner = False
+    server_response_type = 'application/json'
 
     def authenticate(self, headers):
         ''' MyHandler:authenticate()
@@ -28,9 +29,9 @@ class MyHandler(BaseHTTPServer.BaseHTTPRequestHandler):
         if "x-token" not in headers:
             log('Invalid request sent to server: no identification provided.')
             self.send_response(400)
-            self.send_header("Content-type", "text/html")
+            self.send_header("Content-type", self.server_response_type)
             self.end_headers()
-            self.wfile.write("<html><body>You did not provide any authentication.</body></html>")
+            self.wfile.write(json.dumps({'result':'You did not provide any authentication.'}))
             return False
 
         # Make sure the token is known by the server
@@ -39,9 +40,9 @@ class MyHandler(BaseHTTPServer.BaseHTTPRequestHandler):
         if not self.partner:
             log('Invalid request sent to server: unknown login credentials: {!s}'.format(headers['x-token']))
             self.send_response(401)
-            self.send_header("Content-type", "text/html")
+            self.send_header("Content-type", self.server_response_type)
             self.end_headers()
-            self.wfile.write("<html><body>Not authorized.</body></html>")
+            self.wfile.write(json.dumps({'result':'Not authorized.'}))
             return False
         self.partner = self.partner[0]
 
@@ -51,16 +52,16 @@ class MyHandler(BaseHTTPServer.BaseHTTPRequestHandler):
         if "content-type" not in headers:
             log('Invalid request sent to server: no content-type provided.')
             self.send_response(400)
-            self.send_header("Content-type", "text/html")
+            self.send_header("Content-type", self.server_response_type)
             self.end_headers()
-            self.wfile.write("<html><body>You did not provide the content-type.</body></html>")
+            self.wfile.write(json.dumps({'result':'You did not provide the content-type.'}))
             return False
         if headers['content-type'] != 'application/json' and headers['content-type'] != 'application/xml':
             log('Invalid request sent to server: incompatible content-type provided.')
             self.send_response(400)
-            self.send_header("Content-type", "text/html")
+            self.send_header("Content-type", self.server_response_type)
             self.end_headers()
-            self.wfile.write("<html><body>You did not provide a valid content-type.</body></html>")
+            self.wfile.write(json.dumps({'result':'You did not provide a valid content-type.'}))
             return False
 
         return True
@@ -85,9 +86,9 @@ class MyHandler(BaseHTTPServer.BaseHTTPRequestHandler):
         if self.path[:5] != '/edi/':
             log('Invalid request sent to server: unknown path provided: {!s}'.format(self.path))
             self.send_response(404)
-            self.send_header("Content-type", "text/html")
+            self.send_header("Content-type", self.server_response_type)
             self.end_headers()
-            self.wfile.write("<html><body>Unknown path.</body></html>")
+            self.wfile.write(json.dumps({'result':'Unknown path.'}))
             return False
 
         self.handle_edi_request()
@@ -107,9 +108,9 @@ class MyHandler(BaseHTTPServer.BaseHTTPRequestHandler):
         if not flow:
             log('Invalid request sent to server: unknown path provided: {!s}'.format(self.path))
             self.send_response(404)
-            self.send_header("Content-type", "text/html")
+            self.send_header("Content-type", self.server_response_type)
             self.end_headers()
-            self.wfile.write("<html><body>Unknown path.</body></html>")
+            self.wfile.write(json.dumps({'result':'Unknown path.'}))
             return False
         flow = flow[0]
 
@@ -119,9 +120,9 @@ class MyHandler(BaseHTTPServer.BaseHTTPRequestHandler):
         if not parameters:
             log('Invalid request sent to server: missing GET parameter reference.')
             self.send_response(400)
-            self.send_header("Content-type", "text/html")
+            self.send_header("Content-type", self.server_response_type)
             self.end_headers()
-            self.wfile.write("<html><body>Bad request. Missing parameter 'reference'</body></html>")
+            self.wfile.write(json.dumps({'result':'Bad request. Missing parameter reference'}))
             return False
 
         length = int(self.headers.getheader('content-length'))
@@ -130,9 +131,9 @@ class MyHandler(BaseHTTPServer.BaseHTTPRequestHandler):
         except Exception as e:
             log('Invalid request sent to server: request data is broken. Error given: {!s}'.format(str(e)))
             self.send_response(400)
-            self.send_header("Content-type", "text/html")
+            self.send_header("Content-type", self.server_response_type)
             self.end_headers()
-            self.wfile.write("<html><body>Bad request.</body></html>")
+            self.wfile.write(json.dumps({'result':'Bad request.'}))
             return False
 
         data_type = 'json'
@@ -149,9 +150,9 @@ class MyHandler(BaseHTTPServer.BaseHTTPRequestHandler):
         except Exception:
             log('OpenERP target server cannot be reached.')
             self.send_response(503)
-            self.send_header("Content-type", "text/html")
+            self.send_header("Content-type", self.server_response_type)
             self.end_headers()
-            self.wfile.write("<html><body>Internal server error: target server cannot be reached. Contact the handig.nl system admins please.</body></html>")
+            self.wfile.write(json.dumps({'result':'Internal server error: target server cannot be reached. Contact the handig.nl system admins please.'}))
             return False
 
 
@@ -160,15 +161,15 @@ class MyHandler(BaseHTTPServer.BaseHTTPRequestHandler):
         if result == True:
             log('OpenERP target server has accepted the request.')
             self.send_response(200)
-            self.send_header("Content-type", "text/html")
+            self.send_header("Content-type", self.server_response_type)
             self.end_headers()
-            self.wfile.write("<html><body>Your data has been successfully received by our target system.</body></html>")
+            self.wfile.write(json.dumps({'result':'Your data has been successfully received by our target system.'}))
         else:
             log('OpenERP target has rejected the request.')
             self.send_response(503)
-            self.send_header("Content-type", "text/html")
+            self.send_header("Content-type", self.server_response_type)
             self.end_headers()
-            self.wfile.write("<html><body>Target server has rejected the request. Error given is: {!s}</body></html>".format(result))
+            self.wfile.write(json.dumps({'result':result}))
 
 
 
